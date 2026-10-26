@@ -1,0 +1,21 @@
+{
+  "id": "com.tstef.customhome",
+  "version": "1.0.0",
+  "vendor": "tstef",
+  "type": "web",
+  "main": "index.html",
+  "title": "Custom Home",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "bgColor": "#0b0f14",
+  "iconColor": "#1e90ff",
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": true,
+  "transparent": false,
+  "requiredPermissions": [
+    "applicationmanager.launch",
+    "settings.read",
+    "activitymanager.read",
+    "activitymanager.write"
+  ]
+}

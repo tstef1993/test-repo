@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080, initial-scale=1, user-scalable=no">
+<title>Custom Home</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#131a22; --panel-2:#1b2530;
+    --fg:#e8eef5; --muted:#8aa0b4; --accent:#1e90ff; --focus:#39d0ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{width:100%; height:100%; overflow:hidden;}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #16202b 0%, var(--bg) 60%);
+    color:var(--fg);
+    font-family:-apple-system, "Helvetica Neue", Arial, sans-serif;
+    -webkit-user-select:none; user-select:none;
+    cursor:none;
+  }
+  .wrap{display:flex; flex-direction:column; height:100%; padding:64px 80px;}
+  header{display:flex; justify-content:space-between; align-items:flex-end;}
+  .clock{font-size:92px; font-weight:200; letter-spacing:2px; line-height:1;}
+  .clock .sec{font-size:40px; color:var(--muted); margin-left:10px;}
+  .date{font-size:28px; color:var(--muted); margin-top:12px;}
+  .meta{text-align:right; color:var(--muted); font-size:24px;}
+  .meta .dev{color:var(--fg); font-size:30px; margin-bottom:6px;}
+
+  .grid{
+    margin-top:auto;
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:28px;
+  }
+  .tile{
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:2px solid transparent;
+    border-radius:20px;
+    height:210px;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+  }
+  .tile .emoji{font-size:64px; line-height:1;}
+  .tile .label{margin-top:16px; font-size:26px; color:var(--fg);}
+  .tile.focus{
+    border-color:var(--focus);
+    transform:scale(1.06);
+    box-shadow:0 0 0 2px rgba(57,208,255,.25), 0 16px 40px rgba(0,0,0,.5);
+  }
+  #toast{
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.8); color:#fff; padding:14px 26px; border-radius:12px;
+    font-size:24px; opacity:0; transition:opacity .2s; pointer-events:none;
+  }
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="clock"><span id="time">--:--</span><span class="sec" id="sec"></span></div>
+        <div class="date" id="date">&nbsp;</div>
+      </div>
+      <div class="meta">
+        <div class="dev" id="devname">Living Room</div>
+        <div id="status">Custom Home</div>
+      </div>
+    </header>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div id="toast"></div>
+
+<script>
+/* ----------------------------------------------------------------------
+   Edit this list to match the apps on YOUR TV.
+   Find exact ids over SSH with:
+     luna-send -n 1 -f luna://com.webos.applicationManager/listApps '{}' \
+       | grep -o '"id":"[^"]*"'
+   `id`     = webOS application id to launch
+   `params` = optional launch params passed to the app
+---------------------------------------------------------------------- */
+var APPS = [
+  { label:"Live TV",  emoji:"📺", id:"com.webos.app.livetv" },
+  { label:"Netflix",  emoji:"🎬", id:"netflix" },
+  { label:"YouTube",  emoji:"▶️", id:"youtube.leanback.v4" },
+  { label:"Prime",    emoji:"🛒", id:"amazon" },
+  { label:"Disney+",  emoji:"✨", id:"com.disney.disneyplus-prod" },
+  { label:"HDMI 1",   emoji:"🔌", id:"com.webos.app.hdmi1" },
+  { label:"HDMI 2",   emoji:"🔌", id:"com.webos.app.hdmi2" },
+  { label:"Browser",  emoji:"🌐", id:"com.webos.app.browser" },
+  { label:"Settings", emoji:"⚙️", id:"com.palm.app.settings" },
+  { label:"Apps",     emoji:"🗂️", id:"com.webos.app.discovery" }
+];
+
+/* ---- Low-level Luna bus bridge (no external libs needed) ---- */
+function luna(uri, params, cb){
+  try{
+    var bridge = new PalmServiceBridge();
+    bridge.onservicecallback = function(msg){
+      try{ cb && cb(JSON.parse(msg)); }catch(e){ cb && cb({}); }
+    };
+    bridge.call(uri, JSON.stringify(params || {}));
+  }catch(e){
+    // Not running on a TV (e.g. desktop preview) — just log.
+    console.log("luna()", uri, params);
+    cb && cb({ returnValue:false, errorText:"no PalmServiceBridge" });
+  }
+}
+
+function launchApp(app){
+  toast("Opening " + app.label + "…");
+  luna("luna://com.webos.applicationManager/launch",
+    { id: app.id, params: app.params || {} },
+    function(res){
+      if(res && res.returnValue === false){
+        toast("Can't open " + app.label + " (" + (res.errorText||"not installed") + ")");
+      }
+    });
+}
+
+/* ---- Build the grid ---- */
+var grid = document.getElementById("grid");
+var tiles = [];
+APPS.forEach(function(app, i){
+  var t = document.createElement("div");
+  t.className = "tile";
+  t.innerHTML = '<div class="emoji">'+app.emoji+'</div><div class="label">'+app.label+'</div>';
+  t.addEventListener("click", function(){ launchApp(app); });
+  grid.appendChild(t);
+  tiles.push(t);
+});
+
+/* ---- Remote / keyboard navigation ---- */
+var COLS = 5;
+var idx = 0;
+function focusTile(n){
+  if(n < 0 || n >= tiles.length) return;
+  tiles[idx].classList.remove("focus");
+  idx = n;
+  tiles[idx].classList.add("focus");
+}
+focusTile(0);
+
+document.addEventListener("keydown", function(e){
+  switch(e.keyCode){
+    case 37: focusTile(idx % COLS === 0 ? idx : idx - 1); break;        // left
+    case 39: focusTile((idx+1) % COLS === 0 ? idx : idx + 1); break;    // right
+    case 38: focusTile(idx - COLS >= 0 ? idx - COLS : idx); break;      // up
+    case 40: focusTile(idx + COLS < tiles.length ? idx + COLS : idx); break; // down
+    case 13: launchApp(APPS[idx]); break;                               // OK / Enter
+    default: return;
+  }
+  e.preventDefault();
+});
+
+/* ---- Clock ---- */
+function pad(n){ return (n<10?"0":"")+n; }
+function tick(){
+  var d = new Date();
+  document.getElementById("time").textContent = pad(d.getHours())+":"+pad(d.getMinutes());
+  document.getElementById("sec").textContent  = pad(d.getSeconds());
+  document.getElementById("date").textContent =
+    d.toLocaleDateString(undefined, { weekday:"long", day:"numeric", month:"long" });
+}
+tick(); setInterval(tick, 1000);
+
+/* ---- Pull the TV's device name for the header (best effort) ---- */
+luna("luna://com.webos.service.systemproperty/getSystemProperties",
+  { keys:["deviceName"] },
+  function(res){ if(res && res.deviceName){ document.getElementById("devname").textContent = res.deviceName; } });
+
+/* ---- Toast helper ---- */
+var toastEl = document.getElementById("toast"), toastTimer;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
+}
+</script>
+</body>
+</html>
