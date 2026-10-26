@@ -84,6 +84,23 @@ TV_HOST=192.168.1.50 ./scripts/install.sh
 This installs the app and drops the autostart script at
 `/var/lib/webosbrew/init.d/30-custom-home.sh`.
 
+#### Windows (PowerShell, no bash)
+
+Windows 10/11 has a built-in `ssh`/`scp`. Enable **SSH** in the Homebrew Channel
+first, then (replace the IP and the `.ipk` filename):
+
+```powershell
+$TV = "192.168.1.50"
+# 1. copy the app + autostart script up
+scp .\dist\com.tstef.customhome_1.0.0_all.ipk root@${TV}:/tmp/app.ipk
+ssh root@$TV "mkdir -p /var/lib/webosbrew/init.d"
+scp .\autostart\webosbrew-autostart.sh root@${TV}:/var/lib/webosbrew/init.d/30-custom-home.sh
+# 2. install the app + make the hook executable
+ssh root@$TV "chmod +x /var/lib/webosbrew/init.d/30-custom-home.sh; luna-send -n 1 -w 60000 -f luna://com.webos.appInstallService/dev/install '{\"id\":\"com.tstef.customhome\",\"ipkUrl\":\"/tmp/app.ipk\",\"subscribe\":false}'"
+# 3. test the launch without rebooting
+ssh root@$TV "sh /var/lib/webosbrew/init.d/30-custom-home.sh"
+```
+
 ### 3. Flip the switch
 
 In the **Homebrew Channel** app, make sure **"Run startup scripts"** is on, then
@@ -152,6 +169,22 @@ luna-send -n 1 -f luna://com.webos.applicationManager/listApps '{}' \
 
 ## Reverting
 
-- Temporarily: disable **"Run startup scripts"** in the Homebrew Channel, reboot.
-- Permanently: delete `/var/lib/webosbrew/init.d/30-custom-home.sh` and uninstall
-  the **Custom Home** app from the launcher.
+Everything here is reversible **without a factory reset**.
+
+**Remove just this launcher** (keep root):
+- Disable **"Run startup scripts"** in the Homebrew Channel (stops autostart
+  immediately), then reboot — or go further:
+- Delete the hook and uninstall the app:
+  ```sh
+  rm -f /var/lib/webosbrew/init.d/30-custom-home.sh
+  luna-send -n 1 -f luna://com.webos.applicationManager/remove '{"id":"com.tstef.customhome"}'
+  ```
+
+**Full un-root back to stock behaviour** (still no factory reset):
+1. Do the removal above.
+2. In the **Homebrew Channel** app, disable **SSH** and **Block OTA updates**.
+3. Uninstall the **Homebrew Channel** app itself (long-press its tile → Delete),
+   which removes the root autostart entry.
+
+After that the TV behaves exactly as stock. A factory reset is only needed if you
+want a guaranteed bit-for-bit factory image — it is not required to revert.
