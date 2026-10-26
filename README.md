@@ -14,6 +14,16 @@ Built for and tested against:
 It should work on any rooted webOS 3.x–7.x set — you may just need to tweak app
 ids in the launcher.
 
+> **Two ways to run this app:**
+> - **Rooted (Homebrew Channel)** — the app launches automatically on **every
+>   boot** via the autostart hook. This is the full experience; see the rest of
+>   this README.
+> - **Developer Mode (no root)** — the app installs as a normal **tile you open
+>   yourself** (or launch over the network). webOS Dev Mode cannot auto-start an
+>   app on boot or replace the home screen — that needs root. Dev Mode is fully
+>   reversible with **no factory reset**. See
+>   [DEVELOPER-MODE.md](DEVELOPER-MODE.md) for the Windows walkthrough.
+
 ---
 
 ## What's in here
